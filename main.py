@@ -11,7 +11,7 @@ import sys
 import argparse
 
 
-def train_model(model, criterion, optimizer, scheduler, dataloaders, num_epochs):
+def train_model(model, criterion, optimizer, scheduler, dataloaders, num_epochs,file_res):
     res_loss = np.zeros((num_epochs,2))
     res_acc = np.zeros((num_epochs,2))
     for epoch in range(num_epochs):
@@ -43,7 +43,7 @@ def train_model(model, criterion, optimizer, scheduler, dataloaders, num_epochs)
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
-                        torch.nn.utils.clip_grad_norm(model.parameters(),clip)
+                        torch.nn.utils.clip_grad_norm_(model.parameters(),clip)
                         optimizer.step()
 
                 # statistics
@@ -57,6 +57,7 @@ def train_model(model, criterion, optimizer, scheduler, dataloaders, num_epochs)
 
             res_loss[epoch,idx] = epoch_loss
             res_acc[epoch,idx] = epoch_acc
+        file_res.write('epoch{}: '.format(epoch)+str(res_loss[epoch,0])+' '+str(res_acc[epoch,0])+' '+str(res_loss[epoch,1])+' '+str(res_acc[epoch,1])+"\n")
     return res_loss, res_acc
 
 if __name__ == '__main__':
@@ -83,6 +84,7 @@ if __name__ == '__main__':
         f_name_regu = 'Regu'
         
     print('save to acc/loss_{}_{}_{}'.format(args.model,args.noise,f_name_regu))
+    file_res = open('train_{}_{}_{}.txt'.format(args.model,args.noise,f_name_regu),'w')
     
     normalize = transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
     grey2rgb = transforms.Lambda(lambda x: x.repeat(3, 1, 1))
@@ -147,14 +149,14 @@ if __name__ == '__main__':
             alexnet.classifier[0].p = 0
             alexnet.classifier[3].p = 0
             alexnet = alexnet.to(device)
-            optimizer_ft = optim.SGD(alexnet.parameters(), lr=0.02, momentum=0.9)
+            optimizer_ft = optim.SGD(alexnet.parameters(), lr=0.01, momentum=0.9)
             exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.95)
-            loss,acc = train_model(alexnet, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs)
+            loss,acc = train_model(alexnet, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs,file_res)
         else:
             alexnet = alexnet.to(device)
-            optimizer_ft = optim.SGD(alexnet.parameters(), lr=0.02, momentum=0.9,weight_decay=0.00001)
+            optimizer_ft = optim.SGD(alexnet.parameters(), lr=0.01, momentum=0.9,weight_decay=0.00001)
             exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.95)
-            loss,acc = train_model(alexnet, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs)
+            loss,acc = train_model(alexnet, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs,file_res)
             
     elif args.model == 'vgg16':
         vgg16 = models.vgg16(pretrained=False)
@@ -167,12 +169,12 @@ if __name__ == '__main__':
             vgg16 = vgg16.to(device)
             optimizer_ft = optim.SGD(vgg16.parameters(), lr=0.1, momentum=0.9)
             exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.95)
-            loss,acc = train_model(vgg16, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs)
+            loss,acc = train_model(vgg16, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs,file_res)
         else:
             vgg16 = vgg16.to(device)
             optimizer_ft = optim.SGD(vgg16.parameters(), lr=0.1, momentum=0.9,weight_decay=0.00001)
             exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.95)
-            loss,acc = train_model(vgg16, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs)
+            loss,acc = train_model(vgg16, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs,file_res)
             
     elif args.model == 'resnet18':
         resnet18 = models.resnet18(pretrained=False)
@@ -183,21 +185,22 @@ if __name__ == '__main__':
             resnet18 = resnet18.to(device)
             optimizer_ft = optim.SGD(resnet18.parameters(), lr=0.1, momentum=0.9)
             exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.95)
-            loss,acc = train_model(resnet18, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs)
+            loss,acc = train_model(resnet18, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs,file_res)
         else:
             resnet18.fc = nn.Sequential(nn.Dropout(0.5),nn.Linear(num_ftrs, 10))
             resnet18 = resnet18.to(device)
             optimizer_ft = optim.SGD(resnet18.parameters(), lr=0.1, momentum=0.9,weight_decay=0.00001)
             exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.95)
-            loss,acc = train_model(resnet18, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs)
+            loss,acc = train_model(resnet18, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs,file_res)
     
     else:
         print('Error input model')
         sys.exit()
     
+    file_res.close()
     #print(acc, loss)
-    np.save('acc_{}_{}_{}'.format(args.model,args.noise,f_name_regu),acc)
-    np.save('loss_{}_{}_{}'.format(args.model,args.noise,f_name_regu),loss)
+    #np.save('acc_{}_{}_{}_{}ep'.format(args.model,args.noise,f_name_regu,str(args.num_epochs)),acc)
+    #np.save('loss_{}_{}_{}_{}ep'.format(args.model,args.noise,f_name_regu,str(args.num_epochs)),loss)
             
             
             
