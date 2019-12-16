@@ -29,7 +29,7 @@ def train_model(model, criterion, optimizer, scheduler, dataloaders, num_epochs)
             for inputs, labels in dataloaders[phase]:
                 inputs = inputs.to(device)
                 labels = labels.to(device)
-
+                
                 # zero the parameter gradients
                 optimizer.zero_grad()
 
@@ -43,6 +43,7 @@ def train_model(model, criterion, optimizer, scheduler, dataloaders, num_epochs)
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
+                        torch.nn.utils.clip_grad_norm(model.parameters(),clip)
                         optimizer.step()
 
                 # statistics
@@ -50,7 +51,7 @@ def train_model(model, criterion, optimizer, scheduler, dataloaders, num_epochs)
                 running_corrects += torch.sum(preds == labels.data)
             if phase == 'train':
                 scheduler.step()
-
+            
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
 
@@ -59,6 +60,9 @@ def train_model(model, criterion, optimizer, scheduler, dataloaders, num_epochs)
     return res_loss, res_acc
 
 if __name__ == '__main__':
+    
+    clip = 1
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--model",help="input model",type=str,choices=['alexnet','vgg16','resnet18'])
     parser.add_argument("--noise",help="input noise",type=str,choices=['true_label','random_label','random_pixel'])
@@ -111,6 +115,7 @@ if __name__ == '__main__':
                                                   shuffle=False, num_workers=2)
         dataloaders = {'train':trainloader, 'val':testloader}
         dataset_sizes = {'train':len(trainset), 'val':len(testset)}
+        
     elif args.noise == 'random_pixel':
         transform_pretrain = transforms.Compose([transforms.Resize((224, 224),interpolation=2),
                                          transforms.ToTensor(),
@@ -128,6 +133,7 @@ if __name__ == '__main__':
                                                   shuffle=False, num_workers=2)
         dataloaders = {'train':trainloader, 'val':testloader}
         dataset_sizes = {'train':len(trainset), 'val':len(testset)}
+        
     else:
         print('Error input noise')
         sys.exit()
@@ -141,12 +147,12 @@ if __name__ == '__main__':
             alexnet.classifier[0].p = 0
             alexnet.classifier[3].p = 0
             alexnet = alexnet.to(device)
-            optimizer_ft = optim.SGD(alexnet.parameters(), lr=0.05, momentum=0.9)
+            optimizer_ft = optim.SGD(alexnet.parameters(), lr=0.02, momentum=0.9)
             exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.95)
             loss,acc = train_model(alexnet, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs)
         else:
             alexnet = alexnet.to(device)
-            optimizer_ft = optim.SGD(alexnet.parameters(), lr=0.05, momentum=0.9,weight_decay=0.00001)
+            optimizer_ft = optim.SGD(alexnet.parameters(), lr=0.02, momentum=0.9,weight_decay=0.00001)
             exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.95)
             loss,acc = train_model(alexnet, criterion, optimizer_ft, exp_lr_scheduler, dataloaders, args.num_epochs)
             
