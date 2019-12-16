@@ -67,6 +67,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--model",help="input model",type=str,choices=['alexnet','vgg16','resnet18'])
     parser.add_argument("--noise",help="input noise",type=str,choices=['true_label','random_label','random_pixel'])
+    parser.add_argument("--data",help="training data",type=str,default='mnist_fashion',choices=['mnist_fashion','cifar10'])
     parser.add_argument("--num_epochs",help="number of epochs",type=int)
     parser.add_argument("--gpu",help="index of GPU",type=str)
     parser.add_argument("--no_regu",default=False,help="no regulalization",action='store_true')
@@ -83,49 +84,29 @@ if __name__ == '__main__':
     else:
         f_name_regu = 'Regu'
         
-    print('save to acc/loss_{}_{}_{}'.format(args.model,args.noise,f_name_regu))
-    file_res = open('train_{}_{}_{}.txt'.format(args.model,args.noise,f_name_regu),'w')
-    
-    normalize = transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
-    grey2rgb = transforms.Lambda(lambda x: x.repeat(3, 1, 1))
-    transform_pretrain = transforms.Compose([transforms.Resize((224, 224),interpolation=2),
-                                             transforms.ToTensor(),
-                                             grey2rgb,
-                                             normalize
-                                             ])
-
-    if args.noise == 'true_label':
-        trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=False, transform=transform_pretrain)
-        batch_size = 20
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, 
-                                                  shuffle=True, num_workers=2)
-
-        testset = torchvision.datasets.FashionMNIST(root='./data', train=False, download=False, transform=transform_pretrain)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=4, 
-                                                  shuffle=False, num_workers=2)
-        dataloaders = {'train':trainloader, 'val':testloader}
-        dataset_sizes = {'train':len(trainset), 'val':len(testset)}
-        
-    elif args.noise == 'random_label':
-        trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=False, transform=transform_pretrain, target_transform=lambda y: torch.randint(0, 10, (1,)).item())
-        batch_size = 20
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, 
-                                                  shuffle=True, num_workers=2)
-
-        testset = torchvision.datasets.FashionMNIST(root='./data', train=False, download=False, transform=transform_pretrain)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=4, 
-                                                  shuffle=False, num_workers=2)
-        dataloaders = {'train':trainloader, 'val':testloader}
-        dataset_sizes = {'train':len(trainset), 'val':len(testset)}
-        
-    elif args.noise == 'random_pixel':
+    if args.data == 'mnist_fashion':
+        normalize = transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+        grey2rgb = transforms.Lambda(lambda x: x.repeat(3, 1, 1))
         transform_pretrain = transforms.Compose([transforms.Resize((224, 224),interpolation=2),
+                                                 transforms.ToTensor(),
+                                                 grey2rgb,
+                                                 normalize
+                                                 ])
+        if args.noise == 'true_label':
+            trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=False, transform=transform_pretrain)
+        elif args.noise == 'random_label':
+            trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=False, transform=transform_pretrain, target_transform=lambda y: torch.randint(0, 10, (1,)).item())
+        elif args.noise == 'random_pixel':
+            transform_pretrain2 = transforms.Compose([transforms.Resize((224, 224),interpolation=2),
                                          transforms.ToTensor(),
                                          transforms.Lambda(lambda x:torch.rand(x.size())),
                                          grey2rgb,
                                          normalize
                                          ])
-        trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=False, transform=transform_pretrain)
+            trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=False, transform=transform_pretrain2)
+        else:
+            print('Error input noise')
+            sys.exit()
         batch_size = 20
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, 
                                                   shuffle=True, num_workers=2)
@@ -136,9 +117,41 @@ if __name__ == '__main__':
         dataloaders = {'train':trainloader, 'val':testloader}
         dataset_sizes = {'train':len(trainset), 'val':len(testset)}
         
+    elif args.data == 'cifar10':
+        transform = transforms.Compose(
+            [transforms.Resize((224, 224),interpolation=2),
+             transforms.ToTensor(),
+             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        if args.noise == 'true_label':
+            trainset = torchvision.datasets.CIFAR10(root='./cifar10', train=True,download=False, transform=transform)
+        elif args.noise == 'random_label':
+            trainset = torchvision.datasets.CIFAR10(root='./cifar10', train=True,download=False, transform=transform, target_transform=lambda y: torch.randint(0, 10, (1,)).item())
+        elif args.noise == 'random_pixel':
+            transform2 = transforms.Compose(
+                [transforms.Resize((224, 224),interpolation=2),
+                 transforms.ToTensor(),
+                 transforms.Lambda(lambda x:torch.rand(x.size())),
+                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+            trainset = torchvision.datasets.CIFAR10(root='./cifar10', train=True,download=False, transform=transform2)
+        else:
+            print('Error input noise')
+            sys.exit()
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=8,
+                                                  shuffle=True, num_workers=2)
+        testset = torchvision.datasets.CIFAR10(root='./cifar10', train=False,
+                                               download=False, transform=transform)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=4,
+                                                 shuffle=False, num_workers=2)
+        dataloaders = {'train':trainloader, 'val':testloader}
+        dataset_sizes = {'train':len(trainset), 'val':len(testset)}
+
     else:
-        print('Error input noise')
+        print('Error input data')
         sys.exit()
+        
+    print('save to acc/loss_{}_{}_{}_{}'.format(args.model,args.noise,f_name_regu,args.data))
+    file_res = open('train_{}_{}_{}_{}.txt'.format(args.model,args.noise,f_name_regu,args.data),'w',buffering=1)
+
         
     if args.model == 'alexnet':
         alexnet = models.alexnet(pretrained=False)
